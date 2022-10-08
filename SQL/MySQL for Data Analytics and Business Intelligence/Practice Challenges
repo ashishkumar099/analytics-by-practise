@@ -1,0 +1,173 @@
+# Practice SQL – 10 Final Query Questions - Challanges
+
+# Exercise 1-------------------------------------------------------------------------------------------------
+# Find the average salary of male and female employees in each department.
+select ds.dept_name, e.gender, avg(s.salary)
+	 from
+	employees as e
+    join 
+		 ( select * from dept_emp where year(dept_emp.to_date)=9999) as de on e.emp_no=de.emp_no
+    join     
+	     ( select * from salaries where year(salaries.to_date)=9999) as s on e.emp_no=s.emp_no 
+    join
+		departments as ds on ds.dept_no= de.dept_no
+	group by ds.dept_name, e.gender
+    order by ds.dept_name, e.gender;
+
+
+# Exercise 2-------------------------------------------------------------------------------------------------
+# Find the lowest department number encountered the 'dept_emp' table. Then, find the highest department number.
+Select MIN(dept_no) from dept_emp;
+Select MAX(dept_no) from dept_emp;
+
+
+# Exercise 3-------------------------------------------------------------------------------------------------
+# Obtain a table containing the following three fields for all individuals whose employee number is no greater than 10040:
+# - employee number
+# - the smallest department number among the departments where an employee has worked in (use a subquery to retrieve this value from the 'dept_emp' table)
+# - assign '110022' as 'manager' to all individuals whose employee number is less than or equal to 10020, and '110039' to those whose number is between 10021 and 10040 inclusive (use a CASE statement to create the third field).
+# If you've worked correctly, you should obtain an output containing 40 rows. 
+select 
+		e.emp_no, 
+        min(de.dept_no),
+		CASE
+			WHEN e.emp_no <= 10020 THEN '110022'
+			ELSE '110039'
+		END AS manager
+from employees as e
+join
+	dept_emp as de on e.emp_no=de.emp_no
+where e.emp_no <=10040
+group by e.emp_no;
+
+
+
+# Exercise 4-------------------------------------------------------------------------------------------------
+# Retrieve a list with all employees that have been hired in the year 2000.
+select * from employees where year(hire_date) = 2000;
+
+
+
+# Exercise 5-------------------------------------------------------------------------------------------------
+# Retrieve a list of all employees from the ‘titles’ table who are engineers.
+# Repeat the exercise, this time retrieving a list of all employees from the ‘titles’ table who are senior engineers. 
+Select * 
+from titles
+where title like ('%Engineer%');
+
+Select * 
+from titles
+where title like ('%Senior Engineer%');
+
+
+
+# Excercise 6-------------------------------------------------------------------------------------------------
+# Create a procedure that asks you to insert an employee number to obtain an output containing the same number, as well as the number and name of the last department the employee has worked for.
+# Finally, call the procedure for employee number 10010.
+# If you've worked correctly, you should see that employee number 10010 has worked for department number 6 - "Quality Management".
+
+drop procedure if exists last_dept;
+delimiter $$
+create procedure last_dept(in p_emp_no integer)
+begin
+select ds.dept_no, ds.dept_name
+from employees as e
+join dept_emp as de on e.emp_no=de.emp_no
+join departments as ds on de.dept_no=ds.dept_no
+where year(de.to_date)=9999 and e.emp_no=p_emp_no;
+end $$
+delimiter ; 
+call employees.last_dept(10010);
+
+
+
+# Exercise 7-------------------------------------------------------------------------------------------------
+# How many contracts have been registered in the ‘salaries’ table with duration of more than one year and of value higher than or equal to $100,000?
+select count(*)
+from salaries 
+where datediff(to_date,from_date)>365 and salary>= 100000;
+
+
+
+# Exercise 8-----------------------------------------------------------------------------------------------------------
+# Create a trigger that checks if the hire date of an employee is higher than the current date. If true, set this date to be the current date. Format the output appropriately (YY-MM-DD).
+# Extra challenge: You may try to declare a new variable called 'today' which stores today's data, and then use it in your trigger!
+# After creating the trigger, execute the following code to see if it's working properly.
+/*
+INSERT employees VALUES ('999904', '1970-01-31', 'John', 'Johnson', 'M', '2025-01-01');  
+
+SELECT 
+    *
+FROM
+    employees
+ORDER BY emp_no DESC;
+*/
+drop trigger if exists trig_hiredate;
+Delimiter $$
+create trigger trig_hiredate
+before insert on employees
+for each row
+begin
+declare today date;
+select date_format(sysdate(),'%Y-%m-%d') into today;
+if new.hire_date > today then
+set new.hire_date= today;
+end if;
+end $$
+delimiter ;
+
+delete from employees where emp_no=999904;
+
+INSERT employees VALUES ('999905', '1970-01-31', 'John', 'Johnson', 'M', '2025-01-01');  
+
+SELECT 
+    *
+FROM
+    employees
+ORDER BY emp_no DESC;
+
+
+
+# Exercise 9------------------------------------------------------------------------------------------------------------
+# Define a function that retrieves the largest contract salary value of an employee. Apply it to employee number 11356. 
+# Also, what is the lowest salary value per contract of the same employee? You may want to create a new function that will deliver this number to you.  Apply it to employee number 11356 again.
+# Feel free to apply the function to other employee numbers as well.
+
+drop function if exists f_highest_salary;
+DELIMITER $$
+create function f_highest_salary (p_emp_no integer) returns decimal(10,2)
+deterministic
+begin
+declare v_highest_salary decimal(10,2);
+select
+    max(s.salary)
+into v_highest_salary from
+    employees e
+        join
+    salaries s on e.emp_no = s.emp_no
+where
+    e.emp_no = p_emp_no;
+return v_highest_salary;
+end$$
+DELIMITER ;
+SELECT F_HIGHEST_SALARY(11356);
+drop function if exists f_lowest_salary;
+DELIMITER $$
+create function f_lowest_salary (p_emp_no integer) returns decimal(10,2)
+deterministic
+begin
+declare v_lowest_salary decimal(10,2);
+select
+    min(s.salary)
+into v_lowest_salary from
+    employees e
+        join
+    salaries s on e.emp_no = s.emp_no
+where
+    e.emp_no = p_emp_no;
+return v_lowest_salary;
+end$$
+
+DELIMITER ;
+
+SELECT F_LOWEST_SALARY(10356);
